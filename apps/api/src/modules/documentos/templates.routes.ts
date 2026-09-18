@@ -4,7 +4,7 @@ import { prisma } from "../../config/prisma";
 import { authMiddleware } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { notFound } from "../../utils/httpError";
-import { upload, publicUrlFor } from "../../utils/upload";
+import { upload, saveUploadedFile } from "../../utils/upload";
 
 export const documentoTemplatesRouter = Router();
 documentoTemplatesRouter.use(authMiddleware);
@@ -84,7 +84,7 @@ documentoTemplatesRouter.post(
 
     const template = await prisma.documentoTemplate.update({
       where: { id: req.params.id },
-      data: { backgroundUrl: publicUrlFor(req.file.filename) },
+      data: { backgroundUrl: await saveUploadedFile(req.file) },
     });
     res.json(template);
   })

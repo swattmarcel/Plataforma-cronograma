@@ -1,21 +1,22 @@
 import fs from "fs";
 import path from "path";
 import multer from "multer";
+import { put } from "@vercel/blob";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env";
 
 const uploadsRoot = path.resolve(process.cwd(), env.uploadsDir);
-if (!fs.existsSync(uploadsRoot)) {
+const usingBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+
+if (!usingBlob && !fs.existsSync(uploadsRoot)) {
   fs.mkdirSync(uploadsRoot, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsRoot),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    cb(null, `${uuid()}${ext}`);
-  },
-});
+// Em produção (Vercel) o disco é somente leitura/efêmero, então os arquivos
+// enviados (fotos, logos, mídias, fundos de documento) vão para o Vercel
+// Blob quando BLOB_READ_WRITE_TOKEN está configurado. Em desenvolvimento
+// local, sem esse token, caem de volta para o disco em ./uploads.
+const storage = multer.memoryStorage();
 
 export const upload = multer({
   storage,
@@ -42,15 +43,44 @@ export const uploadMidia = multer({
   },
 });
 
-export function publicUrlFor(filename: string): string {
+/**
+ * Persiste um arquivo recebido via multer (memoryStorage) e retorna a URL
+ * pública para salvar no banco. Usa Vercel Blob quando disponível, senão
+ * grava em ./uploads (apenas para desenvolvimento local).
+ */
+export async function saveUploadedFile(file: Express.Multer.File): Promise<string> {
+  const ext = path.extname(file.originalname) || "";
+  const filename = `${uuid()}${ext}`;
+
+  if (usingBlob) {
+    const blob = await put(filename, file.buffer, { access: "public", contentType: file.mimetype });
+    return blob.url;
+  }
+
+  fs.writeFileSync(path.join(uploadsRoot, filename), file.buffer);
   return `/uploads/${filename}`;
 }
 
-export function resolveUploadPath(url: string | null | undefined): string | null {
+/**
+ * Resolve uma URL salva (Blob absoluta ou caminho local /uploads/...) para
+ * bytes de imagem, usado ao montar PDFs (logo, foto do animal, fundo do
+ * documento).
+ */
+export async function resolveUploadBytes(url: string | null | undefined): Promise<Buffer | null> {
   if (!url) return null;
-  const filename = path.basename(url);
-  const filePath = path.join(uploadsRoot, filename);
-  return fs.existsSync(filePath) ? filePath : null;
+
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      return Buffer.from(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  const filePath = path.join(uploadsRoot, path.basename(url));
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
 }
 
 export const uploadsRootPath = uploadsRoot;

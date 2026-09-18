@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, apiErrorMessage } from "../../lib/api";
+import { api, apiErrorMessage, resolveFileUrl } from "../../lib/api";
 import type { Animal, Competicao } from "../../types";
 import { Badge, Button, Card, EmptyState, Input, PageTitle, Select, Spinner, Textarea } from "../../components/ui";
 
@@ -127,7 +127,7 @@ export default function Competicoes() {
               {c.midias.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {c.midias.map((m) => (
-                    <a key={m} href={`${api.defaults.baseURL}${m}`} target="_blank" rel="noreferrer" className="text-xs text-teal-700 underline">
+                    <a key={m} href={resolveFileUrl(m)} target="_blank" rel="noreferrer" className="text-xs text-teal-700 underline">
                       mídia
                     </a>
                   ))}

@@ -4,7 +4,7 @@ import { prisma } from "../../config/prisma";
 import { authMiddleware } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { badRequest, notFound } from "../../utils/httpError";
-import { upload, publicUrlFor } from "../../utils/upload";
+import { upload, saveUploadedFile } from "../../utils/upload";
 import { buildPedigreeTree, calculateInbreedingCoefficient, fetchAnimalGraph } from "../../utils/pedigree";
 
 export const animaisRouter = Router();
@@ -170,7 +170,7 @@ animaisRouter.post(
 
     const animal = await prisma.animal.update({
       where: { id: req.params.id },
-      data: { fotoUrl: publicUrlFor(req.file.filename) },
+      data: { fotoUrl: await saveUploadedFile(req.file) },
     });
     res.json(animal);
   })

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { authMiddleware } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { upload, publicUrlFor } from "../../utils/upload";
+import { upload, saveUploadedFile } from "../../utils/upload";
 
 export const criatoriosRouter = Router();
 criatoriosRouter.use(authMiddleware);
@@ -47,7 +47,7 @@ criatoriosRouter.post(
     if (!req.file) {
       return res.status(400).json({ error: "Arquivo de logo não enviado" });
     }
-    const logoUrl = publicUrlFor(req.file.filename);
+    const logoUrl = await saveUploadedFile(req.file);
     const criatorio = await prisma.criatorio.update({
       where: { id: req.auth!.criatorioId },
       data: { logoUrl },

@@ -30,3 +30,13 @@ export function apiErrorMessage(err: unknown, fallback = "Ocorreu um erro. Tente
   }
   return fallback;
 }
+
+/**
+ * Resolve uma URL de arquivo retornada pela API: absolutas (Vercel Blob em
+ * produção) são usadas como estão; relativas (/uploads/... em dev local)
+ * ganham o prefixo da API.
+ */
+export function resolveFileUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${api.defaults.baseURL}${url}`;
+}

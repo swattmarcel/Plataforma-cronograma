@@ -1,8 +1,7 @@
-import fs from "fs";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { env } from "../config/env";
 import { PedigreeNode } from "./pedigree";
-import { resolveUploadPath } from "./upload";
+import { resolveUploadBytes } from "./upload";
 import { generateQrPng } from "./qrcode";
 
 function hexToRgb(hex: string | null | undefined, fallback = { r: 0.15, g: 0.23, b: 0.42 }) {
@@ -15,8 +14,7 @@ function hexToRgb(hex: string | null | undefined, fallback = { r: 0.15, g: 0.23,
   return { r, g, b };
 }
 
-async function embedImageAuto(pdfDoc: PDFDocument, filePath: string) {
-  const bytes = fs.readFileSync(filePath);
+async function embedImageAuto(pdfDoc: PDFDocument, bytes: Buffer) {
   try {
     return await pdfDoc.embedJpg(bytes);
   } catch {
@@ -54,10 +52,10 @@ async function drawBackground(pdfDoc: PDFDocument, page: PDFPage, template?: Tem
   const fundo = hexToRgb(template?.corFundo, { r: 1, g: 1, b: 1 });
   page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(fundo.r, fundo.g, fundo.b) });
 
-  const bgPath = resolveUploadPath(template?.backgroundUrl ?? null);
-  if (bgPath) {
+  const bgBytes = await resolveUploadBytes(template?.backgroundUrl ?? null);
+  if (bgBytes) {
     try {
-      const img = await embedImageAuto(pdfDoc, bgPath);
+      const img = await embedImageAuto(pdfDoc, bgBytes);
       page.drawImage(img, { x: 0, y: 0, width, height, opacity: 0.25 });
     } catch {
       /* ignore malformed background image */
@@ -129,10 +127,10 @@ export async function generatePedigreeCertificatePdf(params: {
 
   // Cabeçalho
   const mostrarLogo = template?.mostrarLogo ?? true;
-  const logoPath = mostrarLogo ? resolveUploadPath(criatorio.logoUrl) : null;
-  if (logoPath) {
+  const logoBytes = mostrarLogo ? await resolveUploadBytes(criatorio.logoUrl) : null;
+  if (logoBytes) {
     try {
-      const img = await embedImageAuto(pdfDoc, logoPath);
+      const img = await embedImageAuto(pdfDoc, logoBytes);
       const logoHeight = 60;
       const logoWidth = (img.width / img.height) * logoHeight;
       page.drawImage(img, { x: 40, y: height - 100, width: logoWidth, height: logoHeight });
@@ -255,11 +253,11 @@ export async function generateCrachaPdf(params: {
   page.drawRectangle({ x: 6, y: 6, width: width - 12, height: height - 12, color: rgb(corFundo.r, corFundo.g, corFundo.b) });
 
   const mostrarLogo = template?.mostrarLogo ?? true;
-  const logoPath = mostrarLogo ? resolveUploadPath(criatorio.logoUrl) : null;
+  const logoBytes = mostrarLogo ? await resolveUploadBytes(criatorio.logoUrl) : null;
   let textStartX = 16;
-  if (logoPath) {
+  if (logoBytes) {
     try {
-      const img = await embedImageAuto(pdfDoc, logoPath);
+      const img = await embedImageAuto(pdfDoc, logoBytes);
       const logoSize = 32;
       page.drawImage(img, { x: width - logoSize - 16, y: height - logoSize - 14, width: logoSize, height: logoSize });
     } catch {

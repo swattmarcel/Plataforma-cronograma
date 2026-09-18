@@ -4,7 +4,7 @@ import { prisma } from "../../config/prisma";
 import { authMiddleware } from "../../middleware/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { badRequest, notFound } from "../../utils/httpError";
-import { publicUrlFor, uploadMidia } from "../../utils/upload";
+import { saveUploadedFile, uploadMidia } from "../../utils/upload";
 
 export const competicoesRouter = Router();
 competicoesRouter.use(authMiddleware);
@@ -67,9 +67,10 @@ competicoesRouter.post(
     if (!existing) throw notFound("Competição não encontrada");
     if (!req.file) throw badRequest("Arquivo não enviado");
 
+    const midiaUrl = await saveUploadedFile(req.file);
     const competicao = await prisma.competicao.update({
       where: { id: req.params.id },
-      data: { midias: { push: publicUrlFor(req.file.filename) } },
+      data: { midias: { push: midiaUrl } },
     });
     res.json(competicao);
   })
