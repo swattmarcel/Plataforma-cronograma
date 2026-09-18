@@ -13,6 +13,7 @@ import TaskModal from './components/TaskModal';
 import CostsManager from './components/CostsManager';
 import ClientArea from './components/ClientArea';
 import ConflictPanel from './components/ConflictPanel';
+import KanbanBoard from './components/KanbanBoard';
 import { exportToExcel, exportToPDF } from './services/exportService';
 import { checkConflictsIA } from './services/geminiService';
 
@@ -52,6 +53,7 @@ const App: React.FC = () => {
 
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
+  const [scheduleView, setScheduleView] = useState<'lista' | 'kanban'>('lista');
 
   useEffect(() => {
     localStorage.setItem('ebook_flow_projects', JSON.stringify(projects));
@@ -362,6 +364,14 @@ const App: React.FC = () => {
                   {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              <div className="flex bg-slate-50 dark:bg-slate-800 p-1 rounded-xl border border-slate-100 dark:border-slate-700 w-fit">
+                <button onClick={() => setScheduleView('lista')} className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleView === 'lista' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400'}`}>
+                  <i className="fa-solid fa-list mr-2"></i>Lista
+                </button>
+                <button onClick={() => setScheduleView('kanban')} className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleView === 'kanban' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400'}`}>
+                  <i className="fa-solid fa-table-columns mr-2"></i>Kanban
+                </button>
+              </div>
               <div className="flex gap-4">
                 <button onClick={() => { setFilterDiscipline('all'); setFilterStatus('all'); }} className="px-6 py-3 text-[10px] font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest">Limpar</button>
                 <button
@@ -384,6 +394,13 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
               <div className="lg:col-span-3 space-y-10">
                 <GanttChart tasks={filteredTasks} alertThresholdDays={activeProject.alertThresholdDays} />
+                {scheduleView === 'kanban' ? (
+                  <KanbanBoard
+                    tasks={filteredTasks}
+                    onUpdateStatus={(taskId, status) => updateTask(activeProject.id, taskId, { status })}
+                    formatDate={formatDate}
+                  />
+                ) : (
                 <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 overflow-hidden">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] text-slate-400 uppercase font-black tracking-widest border-b border-slate-100 dark:border-slate-700">
@@ -441,6 +458,7 @@ const App: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
               <aside className="space-y-10">
                 <SimulationPanel tasks={activeProject.tasks} />
