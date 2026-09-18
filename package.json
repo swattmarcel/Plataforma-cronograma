@@ -13,7 +13,7 @@
     "build:web": "npm run build --workspace=apps/web",
     "build": "npm run build:api && npm run build:web",
     "postinstall": "npm run prisma:generate --workspace=apps/api",
-    "vercel-build": "npm run prisma:generate --workspace=apps/api && npm run build:web"
+    "vercel-build": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run build:web"
   },
   "devDependencies": {
     "@vercel/node": "^3.2.24"
