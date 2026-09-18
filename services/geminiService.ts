@@ -2,12 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task } from "../types";
 
-// Always use the process.env.API_KEY directly in the constructor as a named parameter
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Criado sob demanda: instanciar no carregamento do módulo derruba o app
+// inteiro (a lib lança erro se não houver apiKey) mesmo quando o usuário
+// nunca usa os recursos de IA e não configurou a chave.
+let ai: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!ai) {
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return ai;
+};
 
 export const simulateScenario = async (tasks: Task[], scenario: string) => {
   // Use gemini-3-pro-preview for complex reasoning tasks like schedule impact analysis
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: `Analise o cronograma de produção de ebooks e simule o impacto do seguinte cenário: "${scenario}". 
     
@@ -27,7 +35,7 @@ export const simulateScenario = async (tasks: Task[], scenario: string) => {
 
 export const checkConflictsIA = async (tasks: Task[]) => {
   // Use gemini-3-pro-preview for advanced reasoning and conflict detection
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: `Identifique conflitos lógicos no cronograma de ebooks abaixo. Verifique sobreposição de datas para o mesmo colaborador e dependências impossíveis.
     
