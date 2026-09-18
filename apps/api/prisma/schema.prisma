@@ -1,0 +1,473 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Conta / Criatório
+// ------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  nome         String
+  plano        Plano      @default(GRATIS)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  criatorio    Criatorio?
+}
+
+enum Plano {
+  GRATIS
+  BASICO
+  PRO
+}
+
+model Criatorio {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome               String
+  logoUrl            String?
+  corMacho           String   @default("#2563eb")
+  corFemea           String   @default("#db2777")
+  registroIbama      String?
+  registroClube      String?
+  registroFederacao  String?
+  cidade             String?
+  uf                 String?
+  whatsapp           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  animais            Animal[]
+  casais             Casal[]
+  ninhadas           Ninhada[]
+  financas           Financa[]
+  clientes           Cliente[]
+  vendas             Venda[]
+  documentos         Documento[]
+  documentoTemplates DocumentoTemplate[]
+  eventos            Evento[]
+  registrosSaude     RegistroSaude[]
+  medicacoes         Medicacao[]
+  competicoes        Competicao[]
+  sessoesCanto       SessaoCanto[]
+  transferenciaCodigos TransferenciaCodigo[]
+}
+
+// ------------------------------------------------------------------
+// Plantel / Genealogia
+// ------------------------------------------------------------------
+
+enum Sexo {
+  MACHO
+  FEMEA
+  INDEFINIDO
+}
+
+enum StatusAnimal {
+  ATIVO
+  RESERVADO
+  VENDIDO
+  FALECIDO
+  FUGIU
+}
+
+model Animal {
+  id             String       @id @default(uuid())
+  criatorioId    String
+  criatorio      Criatorio    @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  nome           String
+  especie        String
+  mutacaoCor     String?
+  anilha         String?
+  microchip      String?
+  sexo           Sexo         @default(INDEFINIDO)
+  dataNascimento DateTime?
+  status         StatusAnimal @default(ATIVO)
+  fotoUrl        String?
+  observacoes    String?
+
+  paiId String?
+  pai   Animal? @relation("Paternidade", fields: [paiId], references: [id])
+  maeId String?
+  mae   Animal? @relation("Maternidade", fields: [maeId], references: [id])
+
+  filhosComoPai Animal[] @relation("Paternidade")
+  filhosComoMae Animal[] @relation("Maternidade")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  casaisComoMacho Casal[]     @relation("CasalMacho")
+  casaisComoFemea Casal[]     @relation("CasalFemea")
+  financas        Financa[]
+  vendas          Venda[]
+  documentos      Documento[]
+  eventos         Evento[]
+  ovosNascidos    Ovo[]       @relation("OvoAnimalNascido")
+  registrosSaude  RegistroSaude[]
+  medicacoes      Medicacao[]
+  competicoes     Competicao[]
+  sessoesCanto    SessaoCanto[]
+  transferenciasRecebidas TransferenciaCodigo[]
+
+  @@index([criatorioId])
+  @@index([paiId])
+  @@index([maeId])
+}
+
+// ------------------------------------------------------------------
+// Reprodução
+// ------------------------------------------------------------------
+
+model Casal {
+  id                        String   @id @default(uuid())
+  criatorioId               String
+  criatorio                 Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  apelido                   String?
+  machoId                   String
+  macho                     Animal   @relation("CasalMacho", fields: [machoId], references: [id])
+  femeaId                   String
+  femea                     Animal   @relation("CasalFemea", fields: [femeaId], references: [id])
+  ativo                     Boolean  @default(true)
+  coeficienteConsanguinidade Float?
+  createdAt                 DateTime @default(now())
+
+  ninhadas Ninhada[]
+
+  @@index([criatorioId])
+}
+
+enum StatusNinhada {
+  EM_ANDAMENTO
+  FINALIZADA
+}
+
+model Ninhada {
+  id               String        @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio     @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  casalId          String
+  casal            Casal         @relation(fields: [casalId], references: [id], onDelete: Cascade)
+  dataCruza        DateTime?
+  dataPostura      DateTime?
+  diasIncubacao    Int           @default(21)
+  previsaoEclosao  DateTime?
+  status           StatusNinhada @default(EM_ANDAMENTO)
+  observacoes      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  ovos Ovo[]
+
+  @@index([criatorioId])
+  @@index([casalId])
+}
+
+enum StatusOvo {
+  AGUARDANDO
+  GALADO
+  BRANCO
+  ECLODIU
+  FALHOU
+}
+
+model Ovo {
+  id                String    @id @default(uuid())
+  ninhadaId         String
+  ninhada           Ninhada   @relation(fields: [ninhadaId], references: [id], onDelete: Cascade)
+  numero            Int
+  dataPostura       DateTime?
+  status            StatusOvo @default(AGUARDANDO)
+  dataEclosao       DateTime?
+  animalNascidoId   String?
+  animalNascido     Animal?   @relation("OvoAnimalNascido", fields: [animalNascidoId], references: [id])
+  observacoes       String?
+
+  @@index([ninhadaId])
+}
+
+// ------------------------------------------------------------------
+// Financeiro / Vendas
+// ------------------------------------------------------------------
+
+enum TipoFinanca {
+  RECEITA
+  DESPESA
+}
+
+model Financa {
+  id          String      @id @default(uuid())
+  criatorioId String
+  criatorio   Criatorio   @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  tipo        TipoFinanca
+  categoria   String
+  descricao   String?
+  valor       Decimal     @db.Decimal(12, 2)
+  data        DateTime
+  animalId    String?
+  animal      Animal?     @relation(fields: [animalId], references: [id])
+  createdAt   DateTime    @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+model Cliente {
+  id          String   @id @default(uuid())
+  criatorioId String
+  criatorio   Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  nome        String
+  cpfCnpj     String?
+  endereco    String?
+  whatsapp    String?
+  email       String?
+  observacoes String?
+  createdAt   DateTime @default(now())
+
+  vendas Venda[]
+
+  @@index([criatorioId])
+}
+
+enum TipoVenda {
+  RESERVA
+  VENDA
+}
+
+enum StatusVenda {
+  RESERVADO
+  PAGO
+  ENTREGUE
+  CANCELADO
+}
+
+model Venda {
+  id           String      @id @default(uuid())
+  criatorioId  String
+  criatorio    Criatorio   @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  clienteId    String
+  cliente      Cliente     @relation(fields: [clienteId], references: [id])
+  animalId     String
+  animal       Animal      @relation(fields: [animalId], references: [id])
+  tipo         TipoVenda   @default(RESERVA)
+  status       StatusVenda @default(RESERVADO)
+  valor        Decimal     @db.Decimal(12, 2)
+  sinal        Decimal?    @db.Decimal(12, 2)
+  dataReserva  DateTime?
+  dataVenda    DateTime?
+  observacoes  String?
+  createdAt    DateTime    @default(now())
+
+  @@index([criatorioId])
+  @@index([clienteId])
+  @@index([animalId])
+}
+
+// ------------------------------------------------------------------
+// Documentos (PDF + QR)
+// ------------------------------------------------------------------
+
+enum TipoDocumento {
+  CERTIFICADO_ORIGEM
+  CRACHA
+}
+
+model Documento {
+  id                String        @id @default(uuid())
+  criatorioId       String
+  criatorio         Criatorio     @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId          String
+  animal            Animal        @relation(fields: [animalId], references: [id])
+  tipo              TipoDocumento
+  templateId        String?
+  template          DocumentoTemplate? @relation(fields: [templateId], references: [id])
+  codigoVerificacao String        @unique @default(uuid())
+  geracoes          Int           @default(3)
+  arquivoUrl        String?
+  geradoEm          DateTime      @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+// Personalização de certificados/crachás: cores, fundo, fontes e campos,
+// com possibilidade de salvar múltiplos modelos por criatório.
+model DocumentoTemplate {
+  id               String        @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio     @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  nome             String
+  tipo             TipoDocumento
+  corPrimaria      String        @default("#0f766e")
+  corFundo         String        @default("#ffffff")
+  corTexto         String        @default("#111827")
+  fonte            String        @default("helvetica")
+  mostrarLogo      Boolean       @default(true)
+  mostrarQr        Boolean       @default(true)
+  mostrarRegistrosLegais Boolean @default(true)
+  backgroundUrl    String?
+  padrao           Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  documentos Documento[]
+
+  @@index([criatorioId])
+}
+
+// ------------------------------------------------------------------
+// Dashboard / Alertas
+// ------------------------------------------------------------------
+
+enum TipoEvento {
+  NASCIMENTO_PREVISTO
+  SEPARACAO_FILHOTES
+  VACINA
+  MEDICACAO
+  LICENCA
+  OUTRO
+}
+
+model Evento {
+  id          String     @id @default(uuid())
+  criatorioId String
+  criatorio   Criatorio  @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId    String?
+  animal      Animal?    @relation(fields: [animalId], references: [id])
+  tipo        TipoEvento
+  titulo      String
+  data        DateTime
+  concluido   Boolean    @default(false)
+  observacoes String?
+  createdAt   DateTime   @default(now())
+
+  @@index([criatorioId])
+  @@index([data])
+}
+
+// ------------------------------------------------------------------
+// Saúde + lembretes de medicação (WhatsApp)
+// ------------------------------------------------------------------
+
+enum TipoRegistroSaude {
+  DOENCA
+  TRATAMENTO
+  VACINA
+  OBSERVACAO
+}
+
+model RegistroSaude {
+  id          String            @id @default(uuid())
+  criatorioId String
+  criatorio   Criatorio         @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId    String
+  animal      Animal            @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  tipo        TipoRegistroSaude
+  titulo      String
+  descricao   String?
+  data        DateTime
+  createdAt   DateTime          @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+model Medicacao {
+  id               String    @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  medicamento      String
+  dose             String?
+  horarios         String[]
+  dataInicio       DateTime
+  dataFim          DateTime?
+  ativo            Boolean   @default(true)
+  whatsappAtivo    Boolean   @default(false)
+  ultimoLembreteEm DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+// ------------------------------------------------------------------
+// Competições e contador de cantos
+// ------------------------------------------------------------------
+
+model Competicao {
+  id               String    @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  evento           String
+  data             DateTime
+  quantidadeCantos Int?
+  colocacao        String?
+  observacoes      String?
+  midias           String[]
+  createdAt        DateTime  @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+enum ModoContagem {
+  AUTOMATICO
+  MANUAL
+}
+
+model SessaoCanto {
+  id               String       @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio    @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal       @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  modo             ModoContagem @default(MANUAL)
+  quantidadeCantos Int          @default(0)
+  duracaoSegundos  Int          @default(0)
+  data             DateTime     @default(now())
+  observacoes      String?
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+// ------------------------------------------------------------------
+// Transferência de ave entre criadouros
+// ------------------------------------------------------------------
+
+enum StatusTransferencia {
+  ATIVO
+  USADO
+  CANCELADO
+  EXPIRADO
+}
+
+model TransferenciaCodigo {
+  id                String              @id @default(uuid())
+  criatorioId       String
+  criatorio         Criatorio           @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  codigo            String              @unique
+  status            StatusTransferencia @default(ATIVO)
+  animalId          String?
+  animal            Animal?             @relation(fields: [animalId], references: [id])
+  origemCriatorioId   String?
+  origemCriatorioNome String?
+  criadoEm          DateTime            @default(now())
+  expiraEm          DateTime
+  usadoEm           DateTime?
+
+  @@index([criatorioId])
+}
