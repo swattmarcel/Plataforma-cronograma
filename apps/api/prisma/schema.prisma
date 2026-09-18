@@ -45,14 +45,20 @@ model Criatorio {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  animais    Animal[]
-  casais     Casal[]
-  ninhadas   Ninhada[]
-  financas   Financa[]
-  clientes   Cliente[]
-  vendas     Venda[]
-  documentos Documento[]
-  eventos    Evento[]
+  animais            Animal[]
+  casais             Casal[]
+  ninhadas           Ninhada[]
+  financas           Financa[]
+  clientes           Cliente[]
+  vendas             Venda[]
+  documentos         Documento[]
+  documentoTemplates DocumentoTemplate[]
+  eventos            Evento[]
+  registrosSaude     RegistroSaude[]
+  medicacoes         Medicacao[]
+  competicoes        Competicao[]
+  sessoesCanto       SessaoCanto[]
+  transferenciaCodigos TransferenciaCodigo[]
 }
 
 // ------------------------------------------------------------------
@@ -106,6 +112,11 @@ model Animal {
   documentos      Documento[]
   eventos         Evento[]
   ovosNascidos    Ovo[]       @relation("OvoAnimalNascido")
+  registrosSaude  RegistroSaude[]
+  medicacoes      Medicacao[]
+  competicoes     Competicao[]
+  sessoesCanto    SessaoCanto[]
+  transferenciasRecebidas TransferenciaCodigo[]
 
   @@index([criatorioId])
   @@index([paiId])
@@ -276,6 +287,8 @@ model Documento {
   animalId          String
   animal            Animal        @relation(fields: [animalId], references: [id])
   tipo              TipoDocumento
+  templateId        String?
+  template          DocumentoTemplate? @relation(fields: [templateId], references: [id])
   codigoVerificacao String        @unique @default(uuid())
   geracoes          Int           @default(3)
   arquivoUrl        String?
@@ -283,6 +296,31 @@ model Documento {
 
   @@index([criatorioId])
   @@index([animalId])
+}
+
+// Personalização de certificados/crachás: cores, fundo, fontes e campos,
+// com possibilidade de salvar múltiplos modelos por criatório.
+model DocumentoTemplate {
+  id               String        @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio     @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  nome             String
+  tipo             TipoDocumento
+  corPrimaria      String        @default("#0f766e")
+  corFundo         String        @default("#ffffff")
+  corTexto         String        @default("#111827")
+  fonte            String        @default("helvetica")
+  mostrarLogo      Boolean       @default(true)
+  mostrarQr        Boolean       @default(true)
+  mostrarRegistrosLegais Boolean @default(true)
+  backgroundUrl    String?
+  padrao           Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  documentos Documento[]
+
+  @@index([criatorioId])
 }
 
 // ------------------------------------------------------------------
@@ -313,4 +351,122 @@ model Evento {
 
   @@index([criatorioId])
   @@index([data])
+}
+
+// ------------------------------------------------------------------
+// Saúde + lembretes de medicação (WhatsApp)
+// ------------------------------------------------------------------
+
+enum TipoRegistroSaude {
+  DOENCA
+  TRATAMENTO
+  VACINA
+  OBSERVACAO
+}
+
+model RegistroSaude {
+  id          String            @id @default(uuid())
+  criatorioId String
+  criatorio   Criatorio         @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId    String
+  animal      Animal            @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  tipo        TipoRegistroSaude
+  titulo      String
+  descricao   String?
+  data        DateTime
+  createdAt   DateTime          @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+model Medicacao {
+  id               String    @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  medicamento      String
+  dose             String?
+  horarios         String[]
+  dataInicio       DateTime
+  dataFim          DateTime?
+  ativo            Boolean   @default(true)
+  whatsappAtivo    Boolean   @default(false)
+  ultimoLembreteEm DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+// ------------------------------------------------------------------
+// Competições e contador de cantos
+// ------------------------------------------------------------------
+
+model Competicao {
+  id               String    @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  evento           String
+  data             DateTime
+  quantidadeCantos Int?
+  colocacao        String?
+  observacoes      String?
+  midias           String[]
+  createdAt        DateTime  @default(now())
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+enum ModoContagem {
+  AUTOMATICO
+  MANUAL
+}
+
+model SessaoCanto {
+  id               String       @id @default(uuid())
+  criatorioId      String
+  criatorio        Criatorio    @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  animalId         String
+  animal           Animal       @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  modo             ModoContagem @default(MANUAL)
+  quantidadeCantos Int          @default(0)
+  duracaoSegundos  Int          @default(0)
+  data             DateTime     @default(now())
+  observacoes      String?
+
+  @@index([criatorioId])
+  @@index([animalId])
+}
+
+// ------------------------------------------------------------------
+// Transferência de ave entre criadouros
+// ------------------------------------------------------------------
+
+enum StatusTransferencia {
+  ATIVO
+  USADO
+  CANCELADO
+  EXPIRADO
+}
+
+model TransferenciaCodigo {
+  id                String              @id @default(uuid())
+  criatorioId       String
+  criatorio         Criatorio           @relation(fields: [criatorioId], references: [id], onDelete: Cascade)
+  codigo            String              @unique
+  status            StatusTransferencia @default(ATIVO)
+  animalId          String?
+  animal            Animal?             @relation(fields: [animalId], references: [id])
+  origemCriatorioId   String?
+  origemCriatorioNome String?
+  criadoEm          DateTime            @default(now())
+  expiraEm          DateTime
+  usadoEm           DateTime?
+
+  @@index([criatorioId])
 }

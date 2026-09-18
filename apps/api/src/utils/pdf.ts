@@ -28,6 +28,43 @@ function verifyUrl(codigo: string) {
   return `${env.publicAppUrl}/verificar/${codigo}`;
 }
 
+export interface TemplateOptions {
+  corPrimaria?: string;
+  corFundo?: string;
+  corTexto?: string;
+  fonte?: "helvetica" | "times" | "courier";
+  mostrarLogo?: boolean;
+  mostrarQr?: boolean;
+  mostrarRegistrosLegais?: boolean;
+  backgroundUrl?: string | null;
+}
+
+async function pickFonts(pdfDoc: PDFDocument, fonte: TemplateOptions["fonte"]) {
+  if (fonte === "times") {
+    return { font: await pdfDoc.embedFont(StandardFonts.TimesRoman), fontBold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold) };
+  }
+  if (fonte === "courier") {
+    return { font: await pdfDoc.embedFont(StandardFonts.Courier), fontBold: await pdfDoc.embedFont(StandardFonts.CourierBold) };
+  }
+  return { font: await pdfDoc.embedFont(StandardFonts.Helvetica), fontBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold) };
+}
+
+async function drawBackground(pdfDoc: PDFDocument, page: PDFPage, template?: TemplateOptions) {
+  const { width, height } = page.getSize();
+  const fundo = hexToRgb(template?.corFundo, { r: 1, g: 1, b: 1 });
+  page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(fundo.r, fundo.g, fundo.b) });
+
+  const bgPath = resolveUploadPath(template?.backgroundUrl ?? null);
+  if (bgPath) {
+    try {
+      const img = await embedImageAuto(pdfDoc, bgPath);
+      page.drawImage(img, { x: 0, y: 0, width, height, opacity: 0.25 });
+    } catch {
+      /* ignore malformed background image */
+    }
+  }
+}
+
 function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("pt-BR");
@@ -73,23 +110,26 @@ export async function generatePedigreeCertificatePdf(params: {
   pedigree: PedigreeNode | null;
   codigoVerificacao: string;
   geracoes: number;
+  template?: TemplateOptions;
 }): Promise<Uint8Array> {
-  const { animal, criatorio, pedigree, codigoVerificacao, geracoes } = params;
+  const { animal, criatorio, pedigree, codigoVerificacao, geracoes, template } = params;
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([842, 595]); // A4 paisagem
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const accent = hexToRgb(animal.sexo === "FEMEA" ? criatorio.corFemea : criatorio.corMacho);
+  const { font, fontBold } = await pickFonts(pdfDoc, template?.fonte);
+  const accent = hexToRgb(template?.corPrimaria ?? (animal.sexo === "FEMEA" ? criatorio.corFemea : criatorio.corMacho));
+  const corTexto = hexToRgb(template?.corTexto, { r: 0.15, g: 0.15, b: 0.15 });
 
   const { width, height } = page.getSize();
+
+  await drawBackground(pdfDoc, page, template);
 
   // Moldura
   page.drawRectangle({ x: 16, y: 16, width: width - 32, height: height - 32, borderColor: rgb(accent.r, accent.g, accent.b), borderWidth: 3 });
 
   // Cabeçalho
-  let logoBottom = height - 40;
-  const logoPath = resolveUploadPath(criatorio.logoUrl);
+  const mostrarLogo = template?.mostrarLogo ?? true;
+  const logoPath = mostrarLogo ? resolveUploadPath(criatorio.logoUrl) : null;
   if (logoPath) {
     try {
       const img = await embedImageAuto(pdfDoc, logoPath);
@@ -126,7 +166,7 @@ export async function generatePedigreeCertificatePdf(params: {
     `Anilha: ${animal.anilha ?? "-"}   Microchip: ${animal.microchip ?? "-"}`,
   ];
   for (const line of infoLines) {
-    page.drawText(line, { x: leftX, y, size: 12, font, color: rgb(0.15, 0.15, 0.15) });
+    page.drawText(line, { x: leftX, y, size: 12, font, color: rgb(corTexto.r, corTexto.g, corTexto.b) });
     y -= 20;
   }
 
@@ -153,15 +193,17 @@ export async function generatePedigreeCertificatePdf(params: {
   renderPedigree(pedigree, 1, 0, treeTop - 20);
 
   // Dados legais no rodapé
-  const rodape = [
-    criatorio.registroIbama ? `IBAMA/SISPASS: ${criatorio.registroIbama}` : null,
-    criatorio.registroClube ? `Clube: ${criatorio.registroClube}` : null,
-    criatorio.registroFederacao ? `Federação: ${criatorio.registroFederacao}` : null,
-  ]
-    .filter(Boolean)
-    .join("   •   ");
-  if (rodape) {
-    page.drawText(rodape, { x: leftX, y: 56, size: 9, font, color: rgb(0.35, 0.35, 0.35) });
+  if (template?.mostrarRegistrosLegais ?? true) {
+    const rodape = [
+      criatorio.registroIbama ? `IBAMA/SISPASS: ${criatorio.registroIbama}` : null,
+      criatorio.registroClube ? `Clube: ${criatorio.registroClube}` : null,
+      criatorio.registroFederacao ? `Federação: ${criatorio.registroFederacao}` : null,
+    ]
+      .filter(Boolean)
+      .join("   •   ");
+    if (rodape) {
+      page.drawText(rodape, { x: leftX, y: 56, size: 9, font, color: rgb(0.35, 0.35, 0.35) });
+    }
   }
   page.drawText(`Emitido em ${formatDate(new Date())} • Código: ${codigoVerificacao}`, {
     x: leftX,
@@ -172,17 +214,19 @@ export async function generatePedigreeCertificatePdf(params: {
   });
 
   // QR Code de verificação pública
-  const qrPng = await generateQrPng(verifyUrl(codigoVerificacao));
-  const qrImage = await pdfDoc.embedPng(qrPng);
-  const qrSize = 90;
-  page.drawImage(qrImage, { x: width - qrSize - 40, y: 40, width: qrSize, height: qrSize });
-  page.drawText("Escaneie para validar", {
-    x: width - qrSize - 40,
-    y: 30,
-    size: 8,
-    font,
-    color: rgb(0.35, 0.35, 0.35),
-  });
+  if (template?.mostrarQr ?? true) {
+    const qrPng = await generateQrPng(verifyUrl(codigoVerificacao));
+    const qrImage = await pdfDoc.embedPng(qrPng);
+    const qrSize = 90;
+    page.drawImage(qrImage, { x: width - qrSize - 40, y: 40, width: qrSize, height: qrSize });
+    page.drawText("Escaneie para validar", {
+      x: width - qrSize - 40,
+      y: 30,
+      size: 8,
+      font,
+      color: rgb(0.35, 0.35, 0.35),
+    });
+  }
 
   return pdfDoc.save();
 }
@@ -195,35 +239,59 @@ export async function generateCrachaPdf(params: {
   animal: any;
   criatorio: any;
   codigoVerificacao: string;
+  template?: TemplateOptions;
 }): Promise<Uint8Array> {
-  const { animal, criatorio, codigoVerificacao } = params;
+  const { animal, criatorio, codigoVerificacao, template } = params;
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([283, 170]); // ~10x6cm
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const { font, fontBold } = await pickFonts(pdfDoc, template?.fonte);
   const { width, height } = page.getSize();
-  const accent = hexToRgb(animal.sexo === "FEMEA" ? criatorio.corFemea : criatorio.corMacho);
+  const accent = hexToRgb(template?.corPrimaria ?? (animal.sexo === "FEMEA" ? criatorio.corFemea : criatorio.corMacho));
+  const corFundo = hexToRgb(template?.corFundo, { r: 1, g: 1, b: 1 });
+  const corTexto = hexToRgb(template?.corTexto, { r: 0.2, g: 0.2, b: 0.2 });
 
   page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(accent.r, accent.g, accent.b) });
-  page.drawRectangle({ x: 6, y: 6, width: width - 12, height: height - 12, color: rgb(1, 1, 1) });
+  page.drawRectangle({ x: 6, y: 6, width: width - 12, height: height - 12, color: rgb(corFundo.r, corFundo.g, corFundo.b) });
 
-  page.drawText(criatorio.nome.slice(0, 32), { x: 16, y: height - 24, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
-  page.drawText(animal.nome.slice(0, 22), { x: 16, y: height - 46, size: 16, font: fontBold, color: rgb(accent.r, accent.g, accent.b) });
+  const mostrarLogo = template?.mostrarLogo ?? true;
+  const logoPath = mostrarLogo ? resolveUploadPath(criatorio.logoUrl) : null;
+  let textStartX = 16;
+  if (logoPath) {
+    try {
+      const img = await embedImageAuto(pdfDoc, logoPath);
+      const logoSize = 32;
+      page.drawImage(img, { x: width - logoSize - 16, y: height - logoSize - 14, width: logoSize, height: logoSize });
+    } catch {
+      /* ignore malformed image */
+    }
+  }
+
+  page.drawText(criatorio.nome.slice(0, 32), { x: textStartX, y: height - 24, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText(animal.nome.slice(0, 22), { x: textStartX, y: height - 46, size: 16, font: fontBold, color: rgb(accent.r, accent.g, accent.b) });
   page.drawText(`${animal.especie}${animal.mutacaoCor ? " - " + animal.mutacaoCor : ""}`, {
-    x: 16,
+    x: textStartX,
     y: height - 64,
     size: 10,
     font,
+    color: rgb(corTexto.r, corTexto.g, corTexto.b),
   });
-  page.drawText(`Sexo: ${animal.sexo}`, { x: 16, y: height - 80, size: 10, font });
-  page.drawText(`Anilha: ${animal.anilha ?? "-"}`, { x: 16, y: height - 96, size: 10, font });
-  page.drawText(`Nasc.: ${formatDate(animal.dataNascimento)}`, { x: 16, y: height - 112, size: 10, font });
+  page.drawText(`Sexo: ${animal.sexo}`, { x: textStartX, y: height - 80, size: 10, font, color: rgb(corTexto.r, corTexto.g, corTexto.b) });
+  page.drawText(`Anilha: ${animal.anilha ?? "-"}`, { x: textStartX, y: height - 96, size: 10, font, color: rgb(corTexto.r, corTexto.g, corTexto.b) });
+  page.drawText(`Nasc.: ${formatDate(animal.dataNascimento)}`, {
+    x: textStartX,
+    y: height - 112,
+    size: 10,
+    font,
+    color: rgb(corTexto.r, corTexto.g, corTexto.b),
+  });
 
-  const qrPng = await generateQrPng(verifyUrl(codigoVerificacao));
-  const qrImage = await pdfDoc.embedPng(qrPng);
-  const qrSize = 64;
-  page.drawImage(qrImage, { x: width - qrSize - 16, y: 16, width: qrSize, height: qrSize });
+  if (template?.mostrarQr ?? true) {
+    const qrPng = await generateQrPng(verifyUrl(codigoVerificacao));
+    const qrImage = await pdfDoc.embedPng(qrPng);
+    const qrSize = 64;
+    page.drawImage(qrImage, { x: width - qrSize - 16, y: 16, width: qrSize, height: qrSize });
+  }
 
   return pdfDoc.save();
 }

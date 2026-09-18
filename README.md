@@ -28,6 +28,30 @@ apps/
   cadastro de clientes (CRM), reservas/vendas de filhotes com geração de recibo e contrato.
 - **Configurações (white-label)**: logo do criatório, cores dos crachás, dados legais
   (IBAMA/SISPASS, clube, federação) exibidos nos rodapés dos PDFs.
+- **Saúde**: fichas de saúde por ave (doenças, tratamentos, vacinas, observações) e medicações com
+  horários e lembrete opcional por WhatsApp 5 minutos antes da dose (ver observação abaixo).
+- **Competições**: histórico de campeonatos por ave (evento, cantos, colocação, observações) com
+  upload de áudio/vídeo.
+- **Contador de Cantos**: sessão manual (um toque por canto) ou automática (detecção de picos de
+  volume pelo microfone — não é reconhecimento de espécie/canto por IA), com cronômetro, placar e
+  histórico de sessões.
+- **Transferências entre criadouros**: o destinatário gera um código temporário; quem transfere
+  informa o código e escolhe a ave do próprio plantel para confirmar — genealogia, saúde e
+  competições acompanham a ave para o novo dono.
+- **Importação SISPASS**: upload do PDF exportado do SISPASS/IBAMA, leitura heurística (anilha,
+  espécie, sexo), tela de conferência/edição e importação em lote para o plantel.
+- **Personalização de certificados/crachás**: modelos salvos por criatório com cor principal, cor de
+  fundo, cor do texto, fonte, fundo personalizado e quais campos aparecem (logo, QR, registros
+  legais); é possível marcar um modelo como padrão por tipo de documento.
+
+### Observação sobre o WhatsApp
+
+O envio de lembretes de medicação por WhatsApp depende de um provedor externo (Meta Cloud API,
+Twilio, etc.) que não está incluído neste projeto. Configure `WHATSAPP_API_URL` e
+`WHATSAPP_API_TOKEN` em `apps/api/.env` para ativar o envio real; sem essas variáveis, o lembrete é
+apenas registrado no log do servidor. O disparo em si acontece via
+`POST /internal/lembretes/processar` (protegido por `INTERNAL_CRON_SECRET`), pensado para ser
+chamado por um cron externo a cada minuto.
 
 ## Rodando localmente
 
@@ -61,7 +85,8 @@ como app.
 
 ## Stack
 
-- Backend: Node.js, Express, TypeScript, Prisma ORM, PostgreSQL, JWT, bcrypt, pdf-lib, qrcode, multer
+- Backend: Node.js, Express, TypeScript, Prisma ORM, PostgreSQL, JWT, bcrypt, pdf-lib, qrcode, multer,
+  pdf-parse, nanoid
 - Frontend: React, Vite, TypeScript, Tailwind CSS, React Router, vite-plugin-pwa, axios
 - Modelo de negócio sugerido: SaaS com assinatura recorrente (integração de pagamento — Mercado
   Pago/Stripe/Asaas — não incluída neste MVP, ponto de extensão em `apps/api/src/modules/billing`).

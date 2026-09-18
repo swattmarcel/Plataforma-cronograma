@@ -26,6 +26,7 @@ const documentoSchema = z.object({
   animalId: z.string().uuid(),
   tipo: z.enum(["CERTIFICADO_ORIGEM", "CRACHA"]),
   geracoes: z.number().int().min(1).max(6).default(3),
+  templateId: z.string().uuid().optional().nullable(),
 });
 
 documentosRouter.post(
@@ -37,8 +38,14 @@ documentosRouter.post(
     const animal = await prisma.animal.findFirst({ where: { id: data.animalId, criatorioId } });
     if (!animal) throw notFound("Animal não encontrado");
 
+    let templateId = data.templateId ?? null;
+    if (!templateId) {
+      const padrao = await prisma.documentoTemplate.findFirst({ where: { criatorioId, tipo: data.tipo, padrao: true } });
+      templateId = padrao?.id ?? null;
+    }
+
     const documento = await prisma.documento.create({
-      data: { criatorioId, animalId: data.animalId, tipo: data.tipo, geracoes: data.geracoes },
+      data: { criatorioId, animalId: data.animalId, tipo: data.tipo, geracoes: data.geracoes, templateId },
     });
     res.status(201).json(documento);
   })
@@ -47,7 +54,7 @@ documentosRouter.post(
 async function loadDocumentoCompleto(id: string, criatorioId: string) {
   const documento = await prisma.documento.findFirst({
     where: { id, criatorioId },
-    include: { animal: true, criatorio: true },
+    include: { animal: true, criatorio: true, template: true },
   });
   if (!documento) throw notFound("Documento não encontrado");
   return documento;
@@ -57,6 +64,18 @@ documentosRouter.get(
   "/:id/download",
   asyncHandler(async (req, res) => {
     const documento = await loadDocumentoCompleto(req.params.id, req.auth!.criatorioId);
+    const template = documento.template
+      ? {
+          corPrimaria: documento.template.corPrimaria,
+          corFundo: documento.template.corFundo,
+          corTexto: documento.template.corTexto,
+          fonte: documento.template.fonte as "helvetica" | "times" | "courier",
+          mostrarLogo: documento.template.mostrarLogo,
+          mostrarQr: documento.template.mostrarQr,
+          mostrarRegistrosLegais: documento.template.mostrarRegistrosLegais,
+          backgroundUrl: documento.template.backgroundUrl,
+        }
+      : undefined;
 
     let pdf: Uint8Array;
     if (documento.tipo === "CERTIFICADO_ORIGEM") {
@@ -67,12 +86,14 @@ documentosRouter.get(
         pedigree,
         codigoVerificacao: documento.codigoVerificacao,
         geracoes: documento.geracoes,
+        template,
       });
     } else {
       pdf = await generateCrachaPdf({
         animal: documento.animal,
         criatorio: documento.criatorio,
         codigoVerificacao: documento.codigoVerificacao,
+        template,
       });
     }
 

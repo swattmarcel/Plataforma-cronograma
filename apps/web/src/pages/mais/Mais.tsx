@@ -4,6 +4,12 @@ import { PageTitle } from "../../components/ui";
 const items = [
   { to: "/clientes", label: "Clientes (CRM)", icon: "👤", desc: "Cadastro de compradores" },
   { to: "/vendas", label: "Vendas & Reservas", icon: "🧾", desc: "Reservas, recibos e contratos" },
+  { to: "/saude", label: "Saúde", icon: "🩺", desc: "Fichas de saúde e lembretes de medicação" },
+  { to: "/competicoes", label: "Competições", icon: "🏆", desc: "Histórico de campeonatos" },
+  { to: "/cantos", label: "Contador de Cantos", icon: "🎤", desc: "Automático ou manual, com cronômetro" },
+  { to: "/transferencias", label: "Transferências", icon: "🔁", desc: "Envie ou receba aves entre criadouros" },
+  { to: "/importar-sispass", label: "Importar SISPASS", icon: "📥", desc: "Traga seu plantel de um PDF" },
+  { to: "/documentos/templates", label: "Personalizar documentos", icon: "🎨", desc: "Cores, fundo e fonte dos PDFs" },
   { to: "/lembretes", label: "Lembretes", icon: "⏰", desc: "Vacinas, medicações e licenças" },
   { to: "/configuracoes", label: "Configurações", icon: "⚙️", desc: "Logo, cores e dados legais" },
 ];

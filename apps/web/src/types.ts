@@ -7,6 +7,10 @@ export type TipoVenda = "RESERVA" | "VENDA";
 export type StatusVenda = "RESERVADO" | "PAGO" | "ENTREGUE" | "CANCELADO";
 export type TipoDocumento = "CERTIFICADO_ORIGEM" | "CRACHA";
 export type TipoEvento = "NASCIMENTO_PREVISTO" | "SEPARACAO_FILHOTES" | "VACINA" | "MEDICACAO" | "LICENCA" | "OUTRO";
+export type TipoRegistroSaude = "DOENCA" | "TRATAMENTO" | "VACINA" | "OBSERVACAO";
+export type ModoContagem = "AUTOMATICO" | "MANUAL";
+export type StatusTransferencia = "ATIVO" | "USADO" | "CANCELADO" | "EXPIRADO";
+export type Fonte = "helvetica" | "times" | "courier";
 
 export interface User {
   id: string;
@@ -159,4 +163,86 @@ export interface Evento {
   concluido: boolean;
   observacoes: string | null;
   animal?: { id: string; nome: string } | null;
+}
+
+export interface RegistroSaude {
+  id: string;
+  animalId: string;
+  animal?: { id: string; nome: string };
+  tipo: TipoRegistroSaude;
+  titulo: string;
+  descricao: string | null;
+  data: string;
+}
+
+export interface Medicacao {
+  id: string;
+  animalId: string;
+  animal?: { id: string; nome: string };
+  medicamento: string;
+  dose: string | null;
+  horarios: string[];
+  dataInicio: string;
+  dataFim: string | null;
+  ativo: boolean;
+  whatsappAtivo: boolean;
+}
+
+export interface Competicao {
+  id: string;
+  animalId: string;
+  animal?: { id: string; nome: string };
+  evento: string;
+  data: string;
+  quantidadeCantos: number | null;
+  colocacao: string | null;
+  observacoes: string | null;
+  midias: string[];
+}
+
+export interface SessaoCanto {
+  id: string;
+  animalId: string;
+  animal?: { id: string; nome: string };
+  modo: ModoContagem;
+  quantidadeCantos: number;
+  duracaoSegundos: number;
+  data: string;
+  observacoes: string | null;
+}
+
+export interface DocumentoTemplate {
+  id: string;
+  nome: string;
+  tipo: TipoDocumento;
+  corPrimaria: string;
+  corFundo: string;
+  corTexto: string;
+  fonte: Fonte;
+  mostrarLogo: boolean;
+  mostrarQr: boolean;
+  mostrarRegistrosLegais: boolean;
+  backgroundUrl: string | null;
+  padrao: boolean;
+}
+
+export interface TransferenciaCodigo {
+  id: string;
+  codigo: string;
+  status: StatusTransferencia;
+  animalId: string | null;
+  animal?: { id: string; nome: string; especie: string } | null;
+  origemCriatorioNome: string | null;
+  criadoEm: string;
+  expiraEm: string;
+  usadoEm: string | null;
+  criatorio?: { nome: string };
+}
+
+export interface CandidatoImportacao {
+  linhaOriginal: string;
+  anilha: string;
+  especie: string;
+  sexo: Sexo;
+  nome: string;
 }

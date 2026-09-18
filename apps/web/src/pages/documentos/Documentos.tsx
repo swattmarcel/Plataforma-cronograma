@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import type { Documento } from "../../types";
 import { Badge, Card, EmptyState, PageTitle, Spinner } from "../../components/ui";
@@ -17,7 +18,15 @@ export default function Documentos() {
 
   return (
     <div className="space-y-4">
-      <PageTitle title="Documentos" subtitle="Certificados de origem e crachás emitidos" />
+      <PageTitle
+        title="Documentos"
+        subtitle="Certificados de origem e crachás emitidos"
+        action={
+          <Link to="/documentos/templates" className="text-sm font-semibold text-teal-700">
+            🎨 Personalizar
+          </Link>
+        }
+      />
 
       {isLoading ? (
         <Spinner />

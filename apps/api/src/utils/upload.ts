@@ -29,6 +29,19 @@ export const upload = multer({
   },
 });
 
+// Upload de mídia (áudio/vídeo) para o histórico de competições.
+export const uploadMidia = multer({
+  storage,
+  limits: { fileSize: 40 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith("audio/") && !file.mimetype.startsWith("video/")) {
+      cb(new Error("Apenas arquivos de áudio ou vídeo são permitidos"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 export function publicUrlFor(filename: string): string {
   return `/uploads/${filename}`;
 }
